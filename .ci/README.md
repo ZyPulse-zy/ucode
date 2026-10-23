@@ -1,0 +1,9 @@
+# Independent FFI portability evidence
+
+This control branch validates the test-only candidate `4421a403524e9f511ba363565cc6bbc6124de1b7` on top of maintainer PR #503 (`079a4de01b38701de88f5b560f68bc4d2c466cfa`). The upstream proposal changes only `tests/custom/17_lib_ffi/35_complex_numbers`; these independent build tools are not in that proposal.
+
+The workflow checks the thin bundle, exact Git parent, author, sign-off and changed-file scope. It builds pinned libffi 3.4.7 and json-c 0.19, then runs all 35 native FFI test files (109 cases, no skips). Three real OpenWrt snapshot SDK toolchains separately reproduce the pinned/current-master compiler failures, build the maintainer fix, and use QEMU to run 15 independent assertions per target. Original complex call tests must fail with real cross-compiled C fixtures; candidate cases must explicitly skip on the missing capability. Only after all jobs succeed is the exact source commit published to the fork branch.
+
+SDK and dependency hashes are enforced. These current snapshot SDKs have GCC 14.4.0 but are not asserted byte-identical to the earlier failing packages CI images. Tests cover interpreter/FFI builds and QEMU user-space execution, not full OpenWrt package rebuilds or physical hardware. Unrelated existing full-suite ABI/musl/golden-output discrepancies remain outside this focused matrix. Feature skips are not successful complex calls.
+
+Reproduce the native job with `python3 .ci/restore.py --destination candidate` and `python3 .ci/native.py --candidate candidate --output native-evidence`. Reproduce one target job with `python3 .ci/cross.py --arch powerpc_8548 --candidate candidate --candidate-sha 4421a403524e9f511ba363565cc6bbc6124de1b7 --work-dir cross-build --output-dir cross-evidence --cache-dir download-cache`. Required distro packages are listed in the workflow. All writes stay under the selected independent working directory; no router access is used.

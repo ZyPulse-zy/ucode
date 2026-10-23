@@ -1,0 +1,58 @@
+name: FFI portability evidence
+on:
+  push:
+    branches: [ci/ffi-portability-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake autoconf automake libtool pkgconf
+      - name: Restore exact candidate
+        run: python3 .ci/restore.py --destination candidate
+      - name: Run all 109 native FFI cases
+        run: python3 .ci/native.py --candidate candidate --output native-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ffi-native
+          path: |
+            native-evidence/*.json
+            native-evidence/*.log
+          if-no-files-found: error
+  cross:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [powerpc_8548, powerpc_464fp, riscv64_generic]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and emulation dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake autoconf automake libtool pkgconf zstd qemu-user-static flex bison
+      - name: Restore exact candidate
+        run: python3 .ci/restore.py --destination candidate
+      - name: Reproduce compiler failures and verify runtime behavior
+        run: python3 .ci/cross.py --arch '${{ matrix.arch }}' --candidate candidate --candidate-sha 4421a403524e9f511ba363565cc6bbc6124de1b7 --work-dir cross-build --output-dir cross-evidence --cache-dir download-cache
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ffi-${{ matrix.arch }}
+          path: cross-evidence/
+          if-no-files-found: error
+  publish:
+    needs: [native, cross]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish exact tested single-file source branch
+        run: python3 .ci/restore.py --destination candidate --publish
